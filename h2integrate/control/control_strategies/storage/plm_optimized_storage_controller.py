@@ -270,6 +270,19 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
             storage_out = np.zeros(self.n_timesteps)
             soc_out = np.zeros(self.n_timesteps)
 
+            # Per-timestep history of the MILP decision variables, accumulated
+            # across all rolling windows. Exposed as attributes so callers
+            # (e.g. plotting scripts) can read them via
+            # ``model.control_strategies[i].p_discharge1_full`` etc.
+            self.p_discharge1_full = np.zeros(self.n_timesteps)
+            self.p_discharge2_full = np.zeros(self.n_timesteps)
+            self.p_charge_full = np.zeros(self.n_timesteps)
+            self.p_fromgrid_full = np.zeros(self.n_timesteps)
+            self.p_tocoop_full = np.zeros(self.n_timesteps)
+            self.discharge1_bin_full = np.zeros(self.n_timesteps)
+            self.discharge2_bin_full = np.zeros(self.n_timesteps)
+            self.charge_bin_full = np.zeros(self.n_timesteps)
+
             # Track events used per calendar month so the monthly cap is
             # respected across window boundaries.
             events_used_per_month = {}
@@ -308,10 +321,28 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
                     n_days=int(math.ceil(self.n_timesteps * self.dt_seconds / 86400)),
                 )
 
-                # Count new discharge events to track the monthly cap.
+                # Count new discharge events to track the monthly cap, and
+                # record the per-timestep MILP decision variables.
                 for t in range(window_len):
-                    discharging = pyomo.value(self.dr_model.discharge1[t]) > 0.5
-                    prev_discharging = t > 0 and pyomo.value(self.dr_model.discharge1[t - 1]) > 0.5
+                    abs_t = window_start + t
+
+                    d1_val = pyomo.value(self.dr_model.discharge1[t])
+                    d2_val = pyomo.value(self.dr_model.discharge2[t])
+                    c_val = pyomo.value(self.dr_model.charge[t])
+
+                    self.discharge1_bin_full[abs_t] = d1_val
+                    self.discharge2_bin_full[abs_t] = d2_val
+                    self.charge_bin_full[abs_t] = c_val
+                    self.p_discharge1_full[abs_t] = pyomo.value(self.dr_model.p_discharge1[t])
+                    self.p_discharge2_full[abs_t] = pyomo.value(self.dr_model.p_discharge2[t])
+                    self.p_charge_full[abs_t] = pyomo.value(self.dr_model.p_charge[t])
+                    self.p_fromgrid_full[abs_t] = pyomo.value(self.dr_model.p_fromgrid[t])
+                    self.p_tocoop_full[abs_t] = pyomo.value(self.dr_model.p_tocoop[t])
+
+                    discharging = d1_val > 0.5
+                    prev_discharging = (
+                        t > 0 and pyomo.value(self.dr_model.discharge1[t - 1]) > 0.5
+                    )
                     # Detect the rising edge of a discharge event (0 -> 1) and count
                     # it if it occurs in this window.
                     if discharging and not prev_discharging:

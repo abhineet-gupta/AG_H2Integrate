@@ -47,6 +47,18 @@ pw_start, pw_end = controller._parse_peak_window()
 pw_start_h = pw_start.hour
 pw_end_h = pw_end.hour
 
+# Intermediate MILP decision variables exposed by the controller after run().
+p_discharge1 = controller.p_discharge1_full
+p_discharge2 = controller.p_discharge2_full
+p_charge = controller.p_charge_full
+p_fromgrid = controller.p_fromgrid_full
+p_tocoop = controller.p_tocoop_full
+demand = np.array(
+    model.technology_config["technologies"]["battery"]["model_inputs"]["control_parameters"][
+        "demand_signal"
+    ]
+)[:N]
+
 control_params = model.technology_config["technologies"]["battery"]["model_inputs"][
     "control_parameters"
 ]
@@ -61,7 +73,7 @@ discharge_mask = battery_power > 0
 
 
 plt.rcParams.update({"axes.spines.top": False, "axes.spines.right": False})
-fig, axes = plt.subplots(2, 1, sharex=True, figsize=(11, 7))
+fig, axes = plt.subplots(4, 1, sharex=True, figsize=(11, 11))
 days = pd.date_range(time_index[0].normalize(), periods=14, freq="D", tz=time_index.tz)
 time_window = min(n_timesteps, int(14 * 24 * 3600 / dt_seconds))  # 14 days
 
@@ -101,14 +113,14 @@ ax = axes[0]
 shade_peaks(ax)
 ax.plot(time_index[:time_window], lmp[:time_window], color="steelblue", linewidth=1.0)
 ax.axhline(threshold_pct, color="k", linestyle="--", linewidth=0.8)
-ax.plot(
-    time_index[:time_window][w_discharge],
-    lmp[:time_window][w_discharge],
-    "r*",
-    markersize=8,
-    zorder=5,
-)
-ax.set_ylabel("LMP ($/MWh)", fontsize=8)
+# ax.plot(
+#     time_index[:time_window][w_discharge],
+#     lmp[:time_window][w_discharge],
+#     "r*",
+#     markersize=8,
+#     zorder=5,
+# )
+# ax.set_ylabel("LMP ($/MWh)", fontsize=8)
 ax.set_ylim(bottom=0)
 
 ax = axes[1]
@@ -118,6 +130,64 @@ ax.axhline(90, color="gray", linestyle=":", linewidth=0.7)
 ax.axhline(10, color="gray", linestyle=":", linewidth=0.7)
 ax.set_ylabel("SOC (%)", fontsize=8)
 ax.set_ylim([0, 105])
+
+# Subplot 3: battery power flows (charge plotted negative for visual separation)
+ax = axes[2]
+shade_peaks(ax)
+ax.plot(
+    time_index[:time_window],
+    p_discharge1[:time_window],
+    color="crimson",
+    label="p_discharge1 (G&T)",
+    linewidth=1.0,
+)
+ax.plot(
+    time_index[:time_window],
+    p_discharge2[:time_window],
+    color="darkorange",
+    label="p_discharge2 (Co-Op)",
+    linewidth=1.0,
+)
+ax.plot(
+    time_index[:time_window],
+    -p_charge[:time_window],
+    color="steelblue",
+    label="p_charge (neg)",
+    linewidth=1.0,
+)
+ax.axhline(0, color="k", linewidth=0.5)
+ax.set_ylabel("Battery power (kW)", fontsize=8)
+ax.legend(fontsize=7, loc="upper right", frameon=False)
+
+# Subplot 4: grid / Co-Op flows vs demand
+ax = axes[3]
+shade_peaks(ax)
+ax.plot(
+    time_index[:time_window],
+    demand[:time_window],
+    color="k",
+    label="demand",
+    linewidth=1.0,
+)
+ax.plot(
+    time_index[:time_window],
+    p_fromgrid[:time_window],
+    color="purple",
+    label="p_fromgrid",
+    linewidth=1.0,
+    linestyle="--",
+)
+ax.plot(
+    time_index[:time_window],
+    p_tocoop[:time_window],
+    color="teal",
+    label="p_tocoop",
+    linewidth=1.0,
+    linestyle=":",
+)
+ax.set_ylabel("Grid / Co-Op (kW)", fontsize=8)
+ax.set_xlabel("Time")
+ax.legend(fontsize=7, loc="upper right", frameon=False)
 
 
 plt.tight_layout()
