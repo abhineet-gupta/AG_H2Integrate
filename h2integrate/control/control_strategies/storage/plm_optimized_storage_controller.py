@@ -711,7 +711,8 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
         m.consumer_demand = pyomo.Constraint(
             m.T,
             rule=lambda mdl, t: (
-                signal_d[t] == mdl.p_tocoop[t] + mdl.p_discharge2[t] - mdl.p_charge[t]
+                signal_d[t]
+                == mdl.p_tocoop[t] + mdl.p_discharge1[t] + mdl.p_discharge2[t] - mdl.p_charge[t]
             ),
         )
 
@@ -719,7 +720,7 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
         m.coop_demand = pyomo.Constraint(
             m.T,
             rule=lambda mdl, t: (
-                mdl.p_tocoop[t] == mdl.p_fromgrid[t] + mdl.p_discharge1[t]
+                mdl.p_tocoop[t] == mdl.p_fromgrid[t]
             ),
         )
 
