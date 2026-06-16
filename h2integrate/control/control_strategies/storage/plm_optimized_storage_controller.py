@@ -277,7 +277,6 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
             self.p_discharge1_history = np.zeros(self.n_timesteps)
             self.p_discharge2_history = np.zeros(self.n_timesteps)
             self.p_charge_history = np.zeros(self.n_timesteps)
-            self.p_fromgrid_history = np.zeros(self.n_timesteps)
             self.p_tocoop_history = np.zeros(self.n_timesteps)
             self.discharge1_bin_history = np.zeros(self.n_timesteps)
             self.discharge2_bin_history = np.zeros(self.n_timesteps)
@@ -336,7 +335,6 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
                     self.p_discharge1_history[abs_t] = pyomo.value(self.dr_model.p_discharge1[t])
                     self.p_discharge2_history[abs_t] = pyomo.value(self.dr_model.p_discharge2[t])
                     self.p_charge_history[abs_t] = pyomo.value(self.dr_model.p_charge[t])
-                    self.p_fromgrid_history[abs_t] = pyomo.value(self.dr_model.p_fromgrid[t])
                     self.p_tocoop_history[abs_t] = pyomo.value(self.dr_model.p_tocoop[t])
 
                     discharging = d1_val > 0.5
@@ -643,13 +641,8 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
             bounds=(soc_min, soc_max),
             doc="State of charge SoC_t",
         )
-        # Transmitted power
-        m.p_fromgrid = pyomo.Var(
-            m.T,
-            domain=pyomo.NonNegativeReals,
-            bounds=(0, None),
-            doc="Power purchased from the grid by G&T (kW)",
-        )
+
+        # Power transmitted to CoOp
         m.p_tocoop = pyomo.Var(
             m.T,
             domain=pyomo.NonNegativeReals,
@@ -659,9 +652,6 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
 
         # Incentive revenue is earned for every kWh discharged.
         m.objective = pyomo.Objective(
-            # expr= sum(signal_w[t]*m.p_fromgrid[t] for t in m.T) \
-            #     + incentive * dt_hours * sum(m.p_discharge1[t] for t in m.T) \
-            # + sum(self._GnT_pricingfunction(signal_w[t]) for t in m.T),
             expr= - incentive * dt_hours * sum(m.p_discharge1[t] for t in m.T) \
             + sum(self._GnT_pricingfunction(signal_w[t])*m.p_tocoop[t] for t in m.T),
             sense=pyomo.minimize,
@@ -744,7 +734,7 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
         m.no_discharge2_in_window = pyomo.Constraint(
             m.T,
             rule=lambda mdl, t: (
-                mdl.discharge2[t] == 0 if dispatch_window_w[t] else pyomo.Constraint.Skip
+                mdl.discharge2[t] == 0# if dispatch_window_w[t] else pyomo.Constraint.Skip
             ),
         )
 
@@ -756,15 +746,7 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
                 == mdl.p_tocoop[t] + mdl.p_discharge1[t] + mdl.p_discharge2[t] - mdl.p_charge[t]
             ),
         )
-
-        # Meet CoOp demand
-        m.coop_demand = pyomo.Constraint(
-            m.T,
-            rule=lambda mdl, t: (
-                mdl.p_tocoop[t] == mdl.p_fromgrid[t]
-            ),
-        )
-
+        
         return m
 
     def solve_dispatch_model(self, start_time: int = 0, n_days: int = 0):
@@ -851,4 +833,4 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
 
     @staticmethod
     def _GnT_pricingfunction(lmp):
-        return 1.1*lmp + 20
+        return 20

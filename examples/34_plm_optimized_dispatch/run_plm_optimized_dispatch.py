@@ -57,7 +57,6 @@ p_discharge1 = controller.p_discharge1_history
 p_discharge2 = controller.p_discharge2_history
 p_charge = controller.p_charge_history
 p_tocoop = controller.p_tocoop_history
-p_fromgrid = controller.p_fromgrid_history
 
 eventlogmask = [False] * n_timesteps
 for i in range(n_timesteps):
@@ -66,10 +65,12 @@ for i in range(n_timesteps):
     elif u_discharge1[i] == 1 and p_discharge1[i-1] ==0 :
         eventlogmask[i] = True
 
+# Plot outputs
+plotdays = 4
 plt.rcParams.update({"axes.spines.top": False, "axes.spines.right": False})
 fig, axes = plt.subplots(4, 1, sharex=True, figsize=(11, 11))
-days = pd.date_range(time_index[0].normalize(), periods=14, freq="D", tz=time_index.tz)
-plot_time_window = min(n_timesteps, int(14 * 24 * 3600 / dt_seconds))  # 14 days
+days = pd.date_range(time_index[0].normalize(), periods=plotdays, freq="D", tz=time_index.tz)
+plot_time_window = min(n_timesteps, int(plotdays * 24 * 3600 / dt_seconds))  # 14 days
 
 
 def shade_peaks(ax):
@@ -82,25 +83,23 @@ def shade_peaks(ax):
             linewidth=0,
             zorder=0,
         )
-        # if half_td is None:
-        #     continue
-        # pw_start_ts = day + pd.Timedelta(hours=pw_start_h)
-        # pw_end_ts = day + pd.Timedelta(hours=pw_end_h)
-        # in_pw = (time_index >= pw_start_ts) & (time_index <= pw_end_ts)
-        # if not in_pw.any():
-        #     continue
-        # peak_idx = np.where(in_pw)[0][np.argmax(lmp[in_pw])]
-        # peak_ts = time_index[peak_idx]
-        # ax.axvspan(
-        #     peak_ts - half_td,
-        #     peak_ts + half_td,
-        #     color="darkorange",
-        #     alpha=0.30,
-        #     linewidth=0,
-        #     zorder=0,
-        # )
-        #
-
+        if half_td is None:
+            continue
+        pw_start_ts = day + pd.Timedelta(hours=pw_start_h)
+        pw_end_ts = day + pd.Timedelta(hours=pw_end_h)
+        in_pw = (time_index >= pw_start_ts) & (time_index <= pw_end_ts)
+        if not in_pw.any():
+            continue
+        peak_idx = np.where(in_pw)[0][np.argmax(lmp[in_pw])]
+        peak_ts = time_index[peak_idx]
+        ax.axvspan(
+            peak_ts - half_td,
+            peak_ts + half_td,
+            color="darkorange",
+            alpha=0.30,
+            linewidth=0,
+            zorder=0,
+        )
 
 ax = axes[0]
 shade_peaks(ax)
@@ -163,19 +162,11 @@ ax.plot(
 )
 ax.plot(
     time_index[:plot_time_window],
-    p_fromgrid[:plot_time_window],
-    color="purple",
-    label="p_fromgrid",
-    linewidth=1.0,
-    linestyle="--",
-)
-ax.plot(
-    time_index[:plot_time_window],
     p_tocoop[:plot_time_window],
     color="teal",
     label="p_tocoop",
     linewidth=1.0,
-    linestyle=":",
+    linestyle="--",
 )
 ax.set_ylabel("Grid / Co-Op (kW)", fontsize=8)
 ax.set_xlabel("Time")
