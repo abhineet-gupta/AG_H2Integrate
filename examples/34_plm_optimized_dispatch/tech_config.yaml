@@ -23,7 +23,7 @@ technologies:
         demand_profile: 0.0
       control_parameters:
         system_commodity_interface_limit: 1.0e9
-        supervisory_signal: !include demand_profiles/lmp.yaml
+        lmp_signal: !include demand_profiles/lmp.yaml
         demand_signal: !include demand_profiles/demand.yaml
         peak_window:
           start: 12:00:00
@@ -35,9 +35,9 @@ technologies:
         event_duration:  # omit or set to null to use static peak_window
           units: h  # any pandas timedelta unit: h, min, s,
           val: 4  # battery eligible +/ - val h around the daily peak
-        min_peak_separation:  # omit or set to null to allow any peak spacing
-          units: h
-          val: 4  # drop any eligible peak within this distance of a higher peak
+        # min_peak_separation:  # omit or set to null to allow any peak spacing
+        #   units: h
+        #   val: 4  # drop any eligible peak within this distance of a higher peak
         round_digits: 4
       cost_parameters:
         cost_year: 2024
