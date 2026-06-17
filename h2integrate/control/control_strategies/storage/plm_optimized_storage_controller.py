@@ -734,7 +734,7 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
         m.no_discharge2_in_window = pyomo.Constraint(
             m.T,
             rule=lambda mdl, t: (
-                mdl.discharge2[t] == 0# if dispatch_window_w[t] else pyomo.Constraint.Skip
+                mdl.discharge2[t] == 0 if dispatch_window_w[t] else pyomo.Constraint.Skip
             ),
         )
 
@@ -833,4 +833,4 @@ class PeakLoadManagementOptimizedStorageController(PyomoStorageControllerBaseCla
 
     @staticmethod
     def _GnT_pricingfunction(lmp):
-        return 20
+        return 1.05 * lmp + 20
