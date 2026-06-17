@@ -3,8 +3,8 @@ This example simulates a Battery Energy Storage system controller
 to demonstrate demand-response and peak-load management dispatch
 using a rolling-horizon MILP controller.
 The battery is scheduled to discharge during high-LMP peak hours
-to maximize incentives and to minimize the operation cost during
-off-peak hours.
+to maximize incentives and during off-peak hours to minimize the
+operation cost.
 """
 
 from pathlib import Path
@@ -58,6 +58,12 @@ p_discharge2 = controller.p_discharge2_history
 p_charge = controller.p_charge_history
 p_tocoop = controller.p_tocoop_history
 
+# Plot outputs
+plotdays = 4
+plt.rcParams.update({"axes.spines.top": False, "axes.spines.right": False})
+fig, axes = plt.subplots(4, 1, sharex=True, figsize=(8, 6))
+days = pd.date_range(time_index[0].normalize(), periods=plotdays, freq="D", tz=time_index.tz)
+plot_time_window = min(n_timesteps, int(plotdays * 24 * 3600 / dt_seconds))  # 14 days
 eventlogmask = [False] * n_timesteps
 for i in range(n_timesteps):
     if i == 0:
@@ -65,21 +71,13 @@ for i in range(n_timesteps):
     elif u_discharge1[i] == 1 and p_discharge1[i-1] ==0 :
         eventlogmask[i] = True
 
-# Plot outputs
-plotdays = 4
-plt.rcParams.update({"axes.spines.top": False, "axes.spines.right": False})
-fig, axes = plt.subplots(4, 1, sharex=True, figsize=(11, 11))
-days = pd.date_range(time_index[0].normalize(), periods=plotdays, freq="D", tz=time_index.tz)
-plot_time_window = min(n_timesteps, int(plotdays * 24 * 3600 / dt_seconds))  # 14 days
-
-
 def shade_peaks(ax):
     for day in days:
         ax.axvspan(
             day + pd.Timedelta(hours=pw_start_h),
             day + pd.Timedelta(hours=pw_end_h),
             color="orange",
-            alpha=0.10,
+            alpha=0.20,
             linewidth=0,
             zorder=0,
         )
@@ -101,9 +99,16 @@ def shade_peaks(ax):
             zorder=0,
         )
 
+# Plot LMP
 ax = axes[0]
 shade_peaks(ax)
-ax.plot(time_index[:plot_time_window], lmp[:plot_time_window], color="steelblue", linewidth=1.0)
+ax.plot(
+    time_index[:plot_time_window],
+    lmp[:plot_time_window],
+    color="steelblue",
+    linewidth=1.0,
+    label="LMP ($/MWh)",
+)
 ax.plot(
     time_index[:plot_time_window][eventlogmask[:plot_time_window]],
     lmp[:plot_time_window][eventlogmask[:plot_time_window]],
@@ -113,65 +118,80 @@ ax.plot(
 )
 ax.set_ylabel("LMP ($/MWh)", fontsize=8)
 ax.set_ylim(bottom=0)
+ax.legend(fontsize=7, loc="upper left", frameon=True)
 
+# Plot SOC
 ax = axes[1]
 shade_peaks(ax)
-ax.plot(time_index[:plot_time_window], soc_pct[:plot_time_window], color="g", linewidth=1.0)
+ax.plot(
+    time_index[:plot_time_window],
+    soc_pct[:plot_time_window],
+    linewidth=1.0,
+    label="Battery SOC (%)",
+)
 ax.axhline(90, color="gray", linestyle=":", linewidth=0.7)
 ax.axhline(10, color="gray", linestyle=":", linewidth=0.7)
-ax.set_ylabel("SOC (%)", fontsize=8)
+ax.set_ylabel("Battery SOC (%)", fontsize=8)
+ax.legend(fontsize=7, loc="lower left", frameon=True)
 ax.set_ylim([0, 105])
 
-# Subplot 3: battery power flows (charge plotted negative for visual separation)
+# Plot battery discharges and charges
 ax = axes[2]
 shade_peaks(ax)
 ax.plot(
     time_index[:plot_time_window],
     p_discharge1[:plot_time_window],
-    color="darkorange",
-    label="p_discharge1 (G&T)",
+    color="green",
+    label="Discharging for G&T",
     linewidth=1.0,
 )
 ax.plot(
     time_index[:plot_time_window],
     p_discharge2[:plot_time_window],
-    color="green",
-    label="p_discharge2 (Co-Op)",
+    color="darkorange",
+    label="Discharging for Co-Op",
     linewidth=1.0,
 )
 ax.plot(
     time_index[:plot_time_window],
     -p_charge[:plot_time_window],
-    color="steelblue",
-    label="p_charge (neg)",
+    color="orange",
+    linestyle = "--",
+    label="Charging",
     linewidth=1.0,
 )
 ax.axhline(0, color="k", linewidth=0.5)
 ax.set_ylabel("Battery power (kW)", fontsize=8)
-ax.legend(fontsize=7, loc="upper right", frameon=False)
+# ax.legend(fontsize=7, loc="lower left", frameon=True)
+ax.legend(
+    fontsize=7,
+    loc="upper center",
+    bbox_to_anchor=(0.5, 1.25),  # x, y position
+    ncol=3,  # arrange legend entries horizontally
+)
 
-# Subplot 4: grid / Co-Op flows vs demand
+# Plot demand and power supply from G&T to Co-Op
 ax = axes[3]
 shade_peaks(ax)
 ax.plot(
     time_index[:plot_time_window],
     demand[:plot_time_window],
     color="k",
-    label="demand",
+    label="Demand",
     linewidth=1.0,
 )
 ax.plot(
     time_index[:plot_time_window],
     p_tocoop[:plot_time_window],
     color="teal",
-    label="p_tocoop",
+    label="G&T to Co-Op",
     linewidth=1.0,
     linestyle="--",
 )
-ax.set_ylabel("Grid / Co-Op (kW)", fontsize=8)
+ax.set_ylabel("Demand (kW)", fontsize=8)
 ax.set_xlabel("Time")
-ax.legend(fontsize=7, loc="upper right", frameon=False)
+ax.set_ylim([2500,6250])
+ax.legend(fontsize=7, loc="lower left", frameon=True)
 
-pass
 plt.tight_layout()
 plt.savefig(EXAMPLE_DIR / "plm_optimized_dispatch.png", dpi=150, bbox_inches="tight")
